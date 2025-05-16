@@ -31,8 +31,9 @@ func main() {
 	defer producer.Close()
 
 	orderRepo := mongo.NewOrderRepository(mongoClient, "e-commerce", "order")
+
 	sessionService := stripeservice.NewCheckoutSessionService()
-	paymentService := service.NewPaymentSerivce(orderRepo, sessionService)
+	paymentService := service.NewPaymentSerivce(orderRepo, sessionService, kafkaService, producer)
 	paymentHandler := handler.NewPaymentHandler(paymentService)
 
 	http.HandleFunc("/payment/start", paymentHandler.PaymentStart)
