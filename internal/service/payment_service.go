@@ -29,15 +29,17 @@ func NewPaymentSerivce(
 	orderStatusUpdater storage.OrderStatusUpdater,
 	sessionStarter stripeadapter.SessionStarter,
 	messageSender kafkaadapter.MessageSender,
-	stringRecordStorer redisadapter.StringRecordStorer,
-	stringRecordGetter redisadapter.StringRecordGetter,
+	redisAdapter interface {
+		redisadapter.StringRecordStorer
+		redisadapter.StringRecordGetter
+	},
 	p *kafka.Producer, rdb *redis.Client) *PaymentService {
 	return &PaymentService{
 		orderStatusUpdater: orderStatusUpdater,
 		sessionStarter:     sessionStarter,
 		messageSender:      messageSender,
-		stringRecordStorer: stringRecordStorer,
-		stringRecordGetter: stringRecordGetter,
+		stringRecordStorer: redisAdapter,
+		stringRecordGetter: redisAdapter,
 		producer:           p,
 		rdb:                rdb,
 	}
@@ -55,7 +57,7 @@ func (s *PaymentService) ProcessPayment(ctx context.Context, orderId primitive.O
 	if err != nil {
 		return "", nil
 	}
-	err := s.messageSender.SendMessage(s.producer, "stripe.checkout_session", []byte(sessionId))
+	err = s.messageSender.SendMessage(s.producer, "stripe.checkout_session", []byte(sessionId))
 	if err != nil {
 		return "", err
 	}
