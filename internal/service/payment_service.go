@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/redis/go-redis"
 	"github.com/stripe/stripe-go/v72"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -21,14 +22,20 @@ type PaymentService struct {
 }
 
 func NewPaymentSerivce(
-	orderStatusUpdater mongo.OrderStatusUpdater,
-	orderGetter mongo.OrderGetter,
-	productGetter mongo.ProductGetter,
-	p *kafka.Producer) *PaymentService {
+	orderStatusUpdater storage.OrderStatusUpdater,
+	sessionStarter stripeadapter.SessionStarter,
+	messageSender kafkaadapter.MessageSender,
+	redisAdapter interface {
+		redisadapter.StringRecordStorer
+		redisadapter.StringRecordGetter
+	},
+	p *kafka.Producer, rdb *redis.Client) *PaymentService {
 	return &PaymentService{
 		orderStatusUpdater: orderStatusUpdater,
-		orderGetter:        orderGetter,
-		productGetter:      productGetter,
+		sessionStarter:     sessionStarter,
+		messageSender:      messageSender,
+		stringRecordStorer: redisAdapter,
+		stringRecordGetter: redisAdapter,
 		producer:           p,
 	}
 }
