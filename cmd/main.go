@@ -6,8 +6,7 @@ import (
 	"paymentprocessor/internal/handler"
 	"paymentprocessor/internal/mongo"
 	"paymentprocessor/internal/service"
-	kafkaservice "paymentprocessor/internal/service/kafka_service"
-	"paymentprocessor/internal/service/stripeservice"
+	"paymentprocessor/internal/service/kafka"
 
 	"github.com/joho/godotenv"
 )
@@ -23,21 +22,22 @@ func main() {
 		panic(err)
 	}
 
-	kafkaService := kafkaservice.NewKafkaService()
+	kafkaService := kafka.NewKafkaService()
 	producer, err := kafkaService.CreateProducer()
 	if err != nil {
 		panic(err)
 	}
 	defer producer.Close()
 
-	orderRepo := mongo.NewOrderRepository(mongoClient, "e-commerce", "order")
+	orderRepo := mongo.NewOrderRepository(mongoClient, "e-commerce", "orders")
+	productRepo := mongo.NewProductRepository(mongoClient, "e-commerce", "products")
 
-	sessionService := stripeservice.NewCheckoutSessionService()
-	paymentService := service.NewPaymentSerivce(orderRepo, sessionService, kafkaService, producer)
+	// sessionService := stripeservice.NewCheckoutSessionService()
+	paymentService := service.NewPaymentSerivce(orderRepo, orderRepo, productRepo, producer)
 	paymentHandler := handler.NewPaymentHandler(paymentService)
 
 	http.HandleFunc("/payment/start", paymentHandler.PaymentStart)
-	http.HandleFunc("/payment/confirm", handler.PaymentConfirmation)
+	http.HandleFunc("/payment/confirm", paymentHandler.PaymentConfirmation)
 
 	if err := http.ListenAndServe(":8000", nil); err != nil {
 		panic(err)

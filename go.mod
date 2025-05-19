@@ -4,8 +4,9 @@ go 1.23.0
 
 require (
 	github.com/confluentinc/confluent-kafka-go v1.9.2
+	github.com/google/uuid v1.3.0
 	github.com/joho/godotenv v1.5.1
-	github.com/stripe/stripe-go v70.15.0+incompatible
+	github.com/stripe/stripe-go/v72 v72.122.0
 	go.mongodb.org/mongo-driver v1.17.3
 )
 

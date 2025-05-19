@@ -1,11 +1,11 @@
-package stripeservice
+package service
 
 import (
 	"os"
 
 	"github.com/joho/godotenv"
-	"github.com/stripe/stripe-go"
-	"github.com/stripe/stripe-go/checkout/session"
+	"github.com/stripe/stripe-go/v72"
+	"github.com/stripe/stripe-go/v72/checkout/session"
 )
 
 var stripeSecret string
@@ -24,7 +24,9 @@ func NewCheckoutSessionService() *CheckoutSessionService {
 	return &CheckoutSessionService{}
 }
 
-func (s *CheckoutSessionService) StartSession(stripeParams []*stripe.CheckoutSessionLineItemParams) (string, error) {
+// func (s *CheckoutSessionService) startSession(
+func startSession(
+	stripeParams []*stripe.CheckoutSessionLineItemParams) (string, string, error) {
 	stripe.Key = stripeSecret
 	params := &stripe.CheckoutSessionParams{
 		SuccessURL: stripe.String("htt"),
@@ -33,11 +35,11 @@ func (s *CheckoutSessionService) StartSession(stripeParams []*stripe.CheckoutSes
 	}
 	result, err := session.New(params)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	return result.ID, nil
+	return result.ID, result.URL, nil
 }
 
-type SessionStarter interface {
-	StartSession(stripeParams []*stripe.CheckoutSessionLineItemParams) (string, error)
-}
+// type SessionStarter interface {
+// 	StartSession(stripeParams []*stripe.CheckoutSessionLineItemParams) (string, string, error)
+// }

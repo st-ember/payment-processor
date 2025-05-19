@@ -10,6 +10,7 @@ import (
 
 type RequestBody struct {
 	OrderId string `json:"order_id"`
+	UserId  string `json:"user_id"`
 }
 
 type PaymentHandler struct {
@@ -37,14 +38,14 @@ func (h *PaymentHandler) PaymentStart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// return the Stripe checkoutSession.url to frontend
-	sessionUrl, err := h.paymentProcessor.ProcessPayment(r.Context(), orderObjectID, nil)
+	checkOutUrl, err := h.paymentProcessor.ProcessPayment(r.Context(), orderObjectID, body.UserId)
 	if err != nil {
 		http.Error(w, "Failed to process payment", http.StatusInternalServerError)
 		return
 	}
 
 	response := map[string]string{
-		"session_url": sessionUrl,
+		"checkout_url": checkOutUrl,
 	}
 
 	jsonData, err := json.Marshal(response)
@@ -58,10 +59,11 @@ func (h *PaymentHandler) PaymentStart(w http.ResponseWriter, r *http.Request) {
 	w.Write(jsonData)
 }
 
-func PaymentConfirmation(w http.ResponseWriter, r *http.Request) {
+func (h *PaymentHandler) PaymentConfirmation(w http.ResponseWriter, r *http.Request) {
 	// listen to stripe's confirmation
-	// set order's status to the right one
+
 	// tell kafka about the confirmation we got
+	// set order's status to the right one
 
 	// 	Retry webhook delivery: Stripe retries if your webhook fails (use idempotency)
 	// Dead-letter queue for failed webhooks
