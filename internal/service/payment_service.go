@@ -19,6 +19,8 @@ import (
 
 type PaymentService struct {
 	orderStatusUpdater storage.OrderStatusUpdater
+	orderGetter        storage.OrderGetter
+	productGetter      storage.ProductGetter
 	sessionStarter     stripeadapter.SessionStarter
 	messageSender      kafkaadapter.MessageSender
 	stringRecordStorer redisadapter.StringRecordStorer
@@ -29,6 +31,8 @@ type PaymentService struct {
 
 func NewPaymentSerivce(
 	orderStatusUpdater storage.OrderStatusUpdater,
+	orderGetter storage.OrderGetter,
+	productGetter storage.ProductGetter,
 	sessionStarter stripeadapter.SessionStarter,
 	messageSender kafkaadapter.MessageSender,
 	redisAdapter interface {
@@ -38,6 +42,8 @@ func NewPaymentSerivce(
 	p *kafka.Producer, rdb *redis.Client) *PaymentService {
 	return &PaymentService{
 		orderStatusUpdater: orderStatusUpdater,
+		orderGetter:        orderGetter,
+		productGetter:      productGetter,
 		sessionStarter:     sessionStarter,
 		messageSender:      messageSender,
 		stringRecordStorer: redisAdapter,
@@ -76,7 +82,7 @@ func (s *PaymentService) ProcessPayment(
 	}
 
 	// tell stripe about the expected payment
-	checkoutId, checkoutUrl, err := startSession(stripeParams)
+	checkoutId, checkoutUrl, err := s.sessionStarter.StartSession(stripeParams)
 	if err != nil {
 		return "", err
 	}
@@ -92,7 +98,7 @@ func (s *PaymentService) ProcessPayment(
 	// tell kafka about the checkout id we got from stripe
 	// checkoutId as key, orderId as value
 	// for cleaner abstraction to check after we get webhook reply
-	err = sendMessage(
+	err = s.messageSender.SendMessage(
 		s.producer,
 		"stripe.checkout_session",
 		[]byte(checkoutId),
@@ -115,7 +121,7 @@ func (s *PaymentService) ProcessPayment(
 	}
 
 	// log stripe session event to kafka to store in db
-	err = sendMessage(
+	err = s.messageSender.SendMessage(
 		s.producer,
 		"logs.payment.checkout",
 		[]byte(orderId.Hex()),
@@ -142,10 +148,6 @@ type PaymentProcessor interface {
 		ctx context.Context,
 		orderId primitive.ObjectID,
 		userId string) (string, error)
-}
-
-type PaymentConfirmer interface {
-	ConfirmPayment(ctx context.Context, sessionId string, status enums.OrderStatus) error
 }
 
 type PaymentConfirmer interface {

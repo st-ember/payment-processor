@@ -1,8 +1,4 @@
-<<<<<<<< HEAD:internal/service/stripe_service.go
 package service
-========
-package stripeadapter
->>>>>>>> 93db7a11bc61ae98a5f9559b80c95ce4aaa743b8:internal/adapters/stripe_adapter/checkout_session.go
 
 import (
 	"os"
@@ -28,8 +24,7 @@ func NewCheckoutSessionService() *CheckoutSessionService {
 	return &CheckoutSessionService{}
 }
 
-// func (s *CheckoutSessionService) startSession(
-func startSession(
+func (s *CheckoutSessionService) StartSession(
 	stripeParams []*stripe.CheckoutSessionLineItemParams) (string, string, error) {
 	stripe.Key = stripeSecret
 	params := &stripe.CheckoutSessionParams{
@@ -44,6 +39,6 @@ func startSession(
 	return result.ID, result.URL, nil
 }
 
-// type SessionStarter interface {
-// 	StartSession(stripeParams []*stripe.CheckoutSessionLineItemParams) (string, string, error)
-// }
+type SessionStarter interface {
+	StartSession(stripeParams []*stripe.CheckoutSessionLineItemParams) (string, string, error)
+}
