@@ -1,4 +1,4 @@
-package stripeservice
+package stripeadapter
 
 import (
 	"os"

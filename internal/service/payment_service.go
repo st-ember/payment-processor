@@ -2,34 +2,44 @@ package service
 
 import (
 	"context"
+	kafkaadapter "paymentprocessor/internal/adapters/kafka_adapter"
+	redisadapter "paymentprocessor/internal/adapters/redis_adapter"
+	stripeadapter "paymentprocessor/internal/adapters/stripe_adapter"
 	"paymentprocessor/internal/enums"
-	"paymentprocessor/internal/mongo"
-	kafkaservice "paymentprocessor/internal/service/kafka_service"
-	"paymentprocessor/internal/service/stripeservice"
+	"paymentprocessor/internal/storage"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/redis/go-redis/v9"
 	"github.com/stripe/stripe-go"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type PaymentService struct {
-	orderStatusUpdater mongo.OrderStatusUpdater
-	sessionStarter     stripeservice.SessionStarter
-	messageSender      kafkaservice.MessageSender
+	orderStatusUpdater storage.OrderStatusUpdater
+	sessionStarter     stripeadapter.SessionStarter
+	messageSender      kafkaadapter.MessageSender
+	stringRecordStorer redisadapter.StringRecordStorer
+	stringRecordGetter redisadapter.StringRecordGetter
 	producer           *kafka.Producer
+	rdb                *redis.Client
 }
 
 func NewPaymentSerivce(
-	orderStatusUpdater mongo.OrderStatusUpdater,
-	sessionStarter stripeservice.SessionStarter,
-	messageSender kafkaservice.MessageSender,
-	p *kafka.Producer) *PaymentService {
+	orderStatusUpdater storage.OrderStatusUpdater,
+	sessionStarter stripeadapter.SessionStarter,
+	messageSender kafkaadapter.MessageSender,
+	stringRecordStorer redisadapter.StringRecordStorer,
+	stringRecordGetter redisadapter.StringRecordGetter,
+	p *kafka.Producer, rdb *redis.Client) *PaymentService {
 	return &PaymentService{
 		orderStatusUpdater: orderStatusUpdater,
 		sessionStarter:     sessionStarter,
 		messageSender:      messageSender,
+		stringRecordStorer: stringRecordStorer,
+		stringRecordGetter: stringRecordGetter,
 		producer:           p,
+		rdb:                rdb,
 	}
 }
 
@@ -54,6 +64,23 @@ func (s *PaymentService) ProcessPayment(ctx context.Context, orderId primitive.O
 	return "", nil
 }
 
+func (s *PaymentService) ConfirmPayment(ctx context.Context, sessionId string, status enums.OrderStatus) error {
+	// get orderId from redis
+	orderId, err := s.stringRecordGetter.GetStringRecord(*s.rdb, ctx, sessionId)
+	if err != nil {
+		return err
+	}
+	// confirm orderId exists in db
+
+	// set order's status to the right one
+
+	return nil
+}
+
 type PaymentProcessor interface {
 	ProcessPayment(ctx context.Context, orderId primitive.ObjectID, stripeParams []*stripe.CheckoutSessionLineItemParams) (string, error)
+}
+
+type PaymentConfirmer interface {
+	ConfirmPayment(ctx context.Context, sessionId string, status enums.OrderStatus) error
 }
