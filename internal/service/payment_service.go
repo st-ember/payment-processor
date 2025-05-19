@@ -3,22 +3,28 @@ package service
 import (
 	"context"
 	"encoding/json"
+	kafkaadapter "paymentprocessor/internal/adapters/kafka_adapter"
+	redisadapter "paymentprocessor/internal/adapters/redis_adapter"
+	stripeadapter "paymentprocessor/internal/adapters/stripe_adapter"
 	"paymentprocessor/internal/enums"
-	"paymentprocessor/internal/mongo"
+	"paymentprocessor/internal/storage"
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"github.com/redis/go-redis"
-	"github.com/stripe/stripe-go/v72"
+	"github.com/redis/go-redis/v9"
+	"github.com/stripe/stripe-go"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type PaymentService struct {
-	orderStatusUpdater mongo.OrderStatusUpdater
-	orderGetter        mongo.OrderGetter
-	productGetter      mongo.ProductGetter
+	orderStatusUpdater storage.OrderStatusUpdater
+	sessionStarter     stripeadapter.SessionStarter
+	messageSender      kafkaadapter.MessageSender
+	stringRecordStorer redisadapter.StringRecordStorer
+	stringRecordGetter redisadapter.StringRecordGetter
 	producer           *kafka.Producer
+	rdb                *redis.Client
 }
 
 func NewPaymentSerivce(
@@ -37,6 +43,7 @@ func NewPaymentSerivce(
 		stringRecordStorer: redisAdapter,
 		stringRecordGetter: redisAdapter,
 		producer:           p,
+		rdb:                rdb,
 	}
 }
 
@@ -117,9 +124,30 @@ func (s *PaymentService) ProcessPayment(
 	return checkoutUrl, nil
 }
 
+func (s *PaymentService) ConfirmPayment(ctx context.Context, sessionId string, status enums.OrderStatus) error {
+	// get orderId from redis
+	orderId, err := s.stringRecordGetter.GetStringRecord(*s.rdb, ctx, sessionId)
+	if err != nil {
+		return err
+	}
+	// confirm orderId exists in db
+
+	// set order's status to the right one
+
+	return nil
+}
+
 type PaymentProcessor interface {
 	ProcessPayment(
 		ctx context.Context,
 		orderId primitive.ObjectID,
 		userId string) (string, error)
+}
+
+type PaymentConfirmer interface {
+	ConfirmPayment(ctx context.Context, sessionId string, status enums.OrderStatus) error
+}
+
+type PaymentConfirmer interface {
+	ConfirmPayment(ctx context.Context, sessionId string, status enums.OrderStatus) error
 }

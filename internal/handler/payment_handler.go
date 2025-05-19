@@ -62,9 +62,6 @@ func (h *PaymentHandler) PaymentStart(w http.ResponseWriter, r *http.Request) {
 func (h *PaymentHandler) PaymentConfirmation(w http.ResponseWriter, r *http.Request) {
 	// listen to stripe's confirmation
 
-	// tell kafka about the confirmation we got
-	// set order's status to the right one
-
 	// 	Retry webhook delivery: Stripe retries if your webhook fails (use idempotency)
 	// Dead-letter queue for failed webhooks
 	// Add handler to manually re-sync payment status from Stripe (e.g., for audits)

@@ -1,12 +1,15 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"os"
+	kafkaadapter "paymentprocessor/internal/adapters/kafka_adapter"
+	redisadapter "paymentprocessor/internal/adapters/redis_adapter"
+	stripeadapter "paymentprocessor/internal/adapters/stripe_adapter"
 	"paymentprocessor/internal/handler"
-	"paymentprocessor/internal/mongo"
 	"paymentprocessor/internal/service"
-	"paymentprocessor/internal/service/kafka"
+	"paymentprocessor/internal/storage"
 
 	"github.com/joho/godotenv"
 )
@@ -17,23 +20,33 @@ func main() {
 		panic(err)
 	}
 
-	mongoClient, err := mongo.Connect(os.Getenv("MONGO_CONN_URI"))
+	ctx := context.Background()
+
+	mongoClient, err := storage.Connect(os.Getenv("MONGO_CONN_URI"))
 	if err != nil {
 		panic(err)
 	}
 
-	kafkaService := kafka.NewKafkaService()
-	producer, err := kafkaService.CreateProducer()
+	// kafka
+	producer, err := kafkaadapter.CreateProducer()
 	if err != nil {
 		panic(err)
 	}
 	defer producer.Close()
+	kafkaClient := kafkaadapter.NewKafkaClient()
 
-	orderRepo := mongo.NewOrderRepository(mongoClient, "e-commerce", "orders")
-	productRepo := mongo.NewProductRepository(mongoClient, "e-commerce", "products")
+	// redis
+	redisClientFactory := redisadapter.NewRedisClientFactory()
+	rdb, err := redisClientFactory.InitRedisClient(ctx)
+	if err != nil {
+		panic(err)
+	}
 
-	// sessionService := stripeservice.NewCheckoutSessionService()
-	paymentService := service.NewPaymentSerivce(orderRepo, orderRepo, productRepo, producer)
+	// repo
+	orderRepo := storage.NewOrderRepository(mongoClient, "e-commerce", "order")
+
+	sessionService := stripeadapter.NewCheckoutSessionService()
+	paymentService := service.NewPaymentSerivce(orderRepo, sessionService, kafkaClient, producer, rdb)
 	paymentHandler := handler.NewPaymentHandler(paymentService)
 
 	http.HandleFunc("/payment/start", paymentHandler.PaymentStart)
