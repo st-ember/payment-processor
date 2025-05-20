@@ -6,13 +6,13 @@ import (
 	kafkaadapter "paymentprocessor/internal/adapters/kafka_adapter"
 	redisadapter "paymentprocessor/internal/adapters/redis_adapter"
 	stripeadapter "paymentprocessor/internal/adapters/stripe_adapter"
-	"paymentprocessor/internal/enums"
+	"paymentprocessor/internal/enum"
 	"paymentprocessor/internal/storage"
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/redis/go-redis/v9"
-	"github.com/stripe/stripe-go"
+	"github.com/stripe/stripe-go/v72"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -29,9 +29,11 @@ type PaymentService struct {
 	rdb                *redis.Client
 }
 
-func NewPaymentSerivce(
-	orderStatusUpdater storage.OrderStatusUpdater,
-	orderGetter storage.OrderGetter,
+func NewPaymentService(
+	orderRepo interface {
+		storage.OrderStatusUpdater
+		storage.OrderGetter
+	},
 	productGetter storage.ProductGetter,
 	sessionStarter stripeadapter.SessionStarter,
 	messageSender kafkaadapter.MessageSender,
@@ -41,8 +43,8 @@ func NewPaymentSerivce(
 	},
 	p *kafka.Producer, rdb *redis.Client) *PaymentService {
 	return &PaymentService{
-		orderStatusUpdater: orderStatusUpdater,
-		orderGetter:        orderGetter,
+		orderStatusUpdater: orderRepo,
+		orderGetter:        orderRepo,
 		productGetter:      productGetter,
 		sessionStarter:     sessionStarter,
 		messageSender:      messageSender,
@@ -90,29 +92,28 @@ func (s *PaymentService) ProcessPayment(
 	// set order to payment pending
 	err = s.orderStatusUpdater.UpdateOrderStatus(
 		ctx, orderId,
-		enums.PaymentPending)
+		enum.PaymentPending)
 	if err != nil {
 		return "", err
 	}
 
-	// tell kafka about the checkout id we got from stripe
+	// tell redis about the checkout id we got from stripe
 	// checkoutId as key, orderId as value
-	// for cleaner abstraction to check after we get webhook reply
-	err = s.messageSender.SendMessage(
-		s.producer,
-		"stripe.checkout_session",
-		[]byte(checkoutId),
-		[]byte(orderId.Hex()))
+
+	// Todo: change to publish for topic-like behavior
+	err = s.stringRecordStorer.StoreStringRecord(s.rdb, ctx, checkoutId, orderId.Hex())
 	if err != nil {
 		return "", err
 	}
 
+	// log stripe session event to kafka to store in db
 	logVal := map[string]string{
-		"level":     "info",
-		"timestamp": time.Now().Format(time.RFC3339),
-		"message":   "Stripe session started",
-		"productId": product.Id.String(),
-		"userId":    userId,
+		"level":      "info",
+		"timestamp":  time.Now().Format(time.RFC3339),
+		"order_id":   orderId.Hex(),
+		"product_id": product.Id.String(),
+		"user_id":    userId,
+		"message":    "Stripe session started",
 	}
 
 	logValBytes, err := json.Marshal(logVal)
@@ -120,7 +121,6 @@ func (s *PaymentService) ProcessPayment(
 		return "", err
 	}
 
-	// log stripe session event to kafka to store in db
 	err = s.messageSender.SendMessage(
 		s.producer,
 		"logs.payment.checkout",
@@ -130,15 +130,28 @@ func (s *PaymentService) ProcessPayment(
 	return checkoutUrl, nil
 }
 
-func (s *PaymentService) ConfirmPayment(ctx context.Context, sessionId string, status enums.OrderStatus) error {
+func (s *PaymentService) ConfirmPayment(ctx context.Context, sessionId string, status enum.OrderStatus) error {
 	// get orderId from redis
-	orderId, err := s.stringRecordGetter.GetStringRecord(*s.rdb, ctx, sessionId)
+	orderId, err := s.stringRecordGetter.GetStringRecord(s.rdb, ctx, sessionId)
 	if err != nil {
 		return err
 	}
+
 	// confirm orderId exists in db
+	orderObjectId, err := primitive.ObjectIDFromHex(orderId)
+	if err != nil {
+		return err
+	}
+	_, err = s.orderGetter.GetOrder(ctx, orderObjectId)
+	if err != nil {
+		return err
+	}
 
 	// set order's status to the right one
+	err = s.orderStatusUpdater.UpdateOrderStatus(ctx, orderObjectId, status)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -151,5 +164,5 @@ type PaymentProcessor interface {
 }
 
 type PaymentConfirmer interface {
-	ConfirmPayment(ctx context.Context, sessionId string, status enums.OrderStatus) error
+	ConfirmPayment(ctx context.Context, sessionId string, status enum.OrderStatus) error
 }

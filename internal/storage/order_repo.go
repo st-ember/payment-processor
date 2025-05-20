@@ -2,7 +2,7 @@ package storage
 
 import (
 	"context"
-	"paymentprocessor/internal/enums"
+	"paymentprocessor/internal/enum"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -30,7 +30,7 @@ func (r *OrderRepo) GetOrder(ctx context.Context, orderId primitive.ObjectID) (O
 	return order, nil
 }
 
-func (r *OrderRepo) UpdateOrderStatus(ctx context.Context, orderId primitive.ObjectID, newStatus enums.OrderStatus) error {
+func (r *OrderRepo) UpdateOrderStatus(ctx context.Context, orderId primitive.ObjectID, newStatus enum.OrderStatus) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
@@ -49,7 +49,7 @@ func (r *OrderRepo) UpdateOrderStatus(ctx context.Context, orderId primitive.Obj
 }
 
 type OrderStatusUpdater interface {
-	UpdateOrderStatus(ctx context.Context, orderId primitive.ObjectID, newStatus enums.OrderStatus) error
+	UpdateOrderStatus(ctx context.Context, orderId primitive.ObjectID, newStatus enum.OrderStatus) error
 }
 
 type OrderGetter interface {

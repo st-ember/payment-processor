@@ -1,18 +1,18 @@
 package storage
 
 import (
-	"paymentprocessor/internal/enums"
+	"paymentprocessor/internal/enum"
 	"time"
 
 	"github.com/google/uuid"
 )
 
 type Order struct {
-	Id          uuid.UUID         `bson:"_id,omitempty"`
-	Product     uuid.UUID         `bson:"product"`
-	Customer    uuid.UUID         `bson:"customer"`
-	PurchasedAt time.Time         `bson:"purchased_at"`
-	Status      enums.OrderStatus `bson:"status"`
+	Id          uuid.UUID        `bson:"_id,omitempty"`
+	Product     uuid.UUID        `bson:"product"`
+	Customer    uuid.UUID        `bson:"customer"`
+	PurchasedAt time.Time        `bson:"purchased_at"`
+	Status      enum.OrderStatus `bson:"status"`
 }
 
 type Product struct {

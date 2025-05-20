@@ -12,7 +12,7 @@ func (a *KafkaClient) SendMessage(p *kafka.Producer, topic string, key, value []
 	deliveryChan := make(chan kafka.Event)
 
 	err := p.Produce(&kafka.Message{
-		TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
+		TopicPartition: kafka.TopicPartition{Topic: &topic},
 		Key:            key,
 		Value:          value,
 	}, deliveryChan)

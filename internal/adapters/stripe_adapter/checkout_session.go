@@ -18,13 +18,13 @@ func init() {
 	stripeSecret = os.Getenv("STRIPE_SECRET")
 }
 
-type CheckoutSessionService struct{}
+type CheckoutSessionUtil struct{}
 
-func NewCheckoutSessionService() *CheckoutSessionService {
-	return &CheckoutSessionService{}
+func NewCheckoutSessionUtil() *CheckoutSessionUtil {
+	return &CheckoutSessionUtil{}
 }
 
-func (s *CheckoutSessionService) StartSession(
+func (s *CheckoutSessionUtil) StartSession(
 	stripeParams []*stripe.CheckoutSessionLineItemParams) (string, string, error) {
 	stripe.Key = stripeSecret
 	params := &stripe.CheckoutSessionParams{

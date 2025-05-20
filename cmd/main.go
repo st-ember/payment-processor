@@ -43,12 +43,17 @@ func main() {
 	}
 	redisUtil := redisadapter.NewRedisUtil()
 
-	// repo
+	// stripe
+	checkoutSessionUtil := stripeadapter.NewCheckoutSessionUtil()
+
+	// repos
 	orderRepo := storage.NewOrderRepository(mongoClient, "e-commerce", "order")
 	productRepo := storage.NewProductRepository(mongoClient, "e-commerce", "product")
 
-	sessionService := stripeadapter.NewCheckoutSessionService()
-	paymentService := service.NewPaymentSerivce(orderRepo, orderRepo, productRepo, sessionService, kafkaClient, redisUtil, producer, rdb)
+	// handlers
+	paymentService := service.NewPaymentService(
+		orderRepo, productRepo, checkoutSessionUtil,
+		kafkaClient, redisUtil, producer, rdb)
 	paymentHandler := handler.NewPaymentHandler(paymentService)
 
 	http.HandleFunc("/payment/start", paymentHandler.PaymentStart)
