@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"encoding/json"
 	"paymentprocessor/internal/domain"
 	"paymentprocessor/internal/domain/enum"
 	"paymentprocessor/internal/domain/request"
@@ -11,6 +10,7 @@ import (
 	stripeadapter "paymentprocessor/internal/infra/stripe_adapter"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/stripe/stripe-go/v72"
 )
 
@@ -35,7 +35,7 @@ func NewPaymentUsecase(
 }
 
 func (u *PaymentUsecase) ProcessPayment(ctx context.Context, req request.StartPaymentReq) (string, error) {
-	// construce stripe param for checkout request
+	// construct stripe param for checkout request
 	stripeParams := []*stripe.CheckoutSessionLineItemParams{
 		{
 			Price:    stripe.String(req.StripePriceId),
@@ -50,37 +50,34 @@ func (u *PaymentUsecase) ProcessPayment(ctx context.Context, req request.StartPa
 	}
 
 	// tell order ms about the payment status through Kafka
-	checkoutVal := map[string]string{
+	checkoutMsg := map[string]string{
 		"timestamp": time.Now().Format(time.RFC3339),
-		"status":    string(rune(enum.Open)),
-	}
-
-	checkoutValBytes, err := json.Marshal(checkoutVal)
-	if err != nil {
-		return "", err
+		"status":    enum.Open.String(),
 	}
 
 	err = u.kafkaClient.SendMessage(
 		kafkaadapter.Topic.PaymentCheckoutSessionStatus,
 		[]byte(req.OrderId.Hex()),
-		checkoutValBytes,
+		checkoutMsg,
 	)
 	if err != nil {
 		return "", err
 	}
 
 	// tell redis about the checkout id we got from stripe
-	// checkoutId as key, orderId as value
-	// Todo: change to publish for topic-like behavior
 	err = u.redisUtil.SetStripeSession(ctx, checkoutId, req.OrderId.Hex())
 	if err != nil {
 		return "", err
 	}
 
-	// Todo: also log to db in case Redis crashes
+	// log to db in case Redis crashes
+	err = u.sessionRepo.Insert(ctx, req.OrderId, checkoutId)
+	if err != nil {
+		return "", err
+	}
 
 	// log stripe session event to Kafka
-	logVal := map[string]string{
+	logMsg := map[string]string{
 		"level":     "info",
 		"timestamp": time.Now().Format(time.RFC3339),
 		"order_id":  req.OrderId.Hex(),
@@ -89,15 +86,10 @@ func (u *PaymentUsecase) ProcessPayment(ctx context.Context, req request.StartPa
 		"message":   "Stripe session started",
 	}
 
-	logValBytes, err := json.Marshal(logVal)
-	if err != nil {
-		return "", err
-	}
-
 	err = u.kafkaClient.SendMessage(
 		kafkaadapter.Topic.LogPaymentCheckout,
 		[]byte(req.OrderId.Hex()),
-		logValBytes,
+		logMsg,
 	)
 	if err != nil {
 		return "", err
@@ -110,12 +102,30 @@ func (u *PaymentUsecase) ConfirmPayment(ctx context.Context, sessionId string, s
 	// get orderId from redis
 	orderId, err := u.redisUtil.GetOrderIdFromSession(ctx, sessionId)
 	if err != nil {
+		if err == redis.Nil {
+			// if sessionId does not exist in redis, try to find in db
+			u.sessionRepo.GetBySessionId(ctx, sessionId)
+		} else {
+			return err
+		}
+	}
+
+	// tell order ms about payment conclusion status
+	msg := map[string]string{
+		"timestamp": time.Now().Format(time.RFC3339),
+		"status":    status.String(),
+	}
+
+	err = u.kafkaClient.SendMessage(
+		kafkaadapter.Topic.PaymentCheckoutSessionStatus,
+		[]byte(orderId),
+		msg,
+	)
+	if err != nil {
 		return err
 	}
 
-	// confirm orderId exists in db
-
-	// set order's status to the right one
+	// add concluded session to db
 
 	return nil
 }

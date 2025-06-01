@@ -39,9 +39,9 @@ func (r *SessionRepo) Insert(ctx context.Context, orderId primitive.ObjectID, se
 	return nil
 }
 
-func (r *SessionRepo) GetById(ctx context.Context, sessionId primitive.ObjectID) (payment.StripeCheckoutSession, error) {
+func (r *SessionRepo) GetBySessionId(ctx context.Context, sessionId string) (payment.StripeCheckoutSession, error) {
 	var session StripeCheckoutSession
-	filter := bson.M{"_id": sessionId}
+	filter := bson.M{"session_id": sessionId}
 	err := r.collection.FindOne(ctx, filter).Decode(&session)
 	if err != nil {
 		return payment.StripeCheckoutSession{}, err
@@ -55,17 +55,20 @@ func (r *SessionRepo) GetById(ctx context.Context, sessionId primitive.ObjectID)
 	return paymentModel, nil
 }
 
-func (r *SessionRepo) UpdateStatus(ctx context.Context, sessionId primitive.ObjectID, newStatus enum.StripeStatus) error {
+func (r *SessionRepo) UpdateStatus(ctx context.Context, sessionId string, newStatus enum.StripeStatus) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
+	filter := bson.M{
+		"session_id": sessionId,
+	}
 	update := bson.M{
 		"$set": bson.M{
 			"status": newStatus,
 		},
 	}
 
-	_, err := r.collection.UpdateByID(ctx, sessionId, update)
+	_, err := r.collection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}

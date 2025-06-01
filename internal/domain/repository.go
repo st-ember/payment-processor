@@ -11,9 +11,9 @@ import (
 type SessionRepo interface {
 	Insert(ctx context.Context, orderId primitive.ObjectID, sessionId string) error
 
-	GetById(ctx context.Context, orderId primitive.ObjectID) (payment.StripeCheckoutSession, error)
+	GetBySessionId(ctx context.Context, sessionId string) (payment.StripeCheckoutSession, error)
 
-	UpdateStatus(ctx context.Context, sessionId primitive.ObjectID, newStatus enum.StripeStatus) error
+	UpdateStatus(ctx context.Context, sessionId string, newStatus enum.StripeStatus) error
 
 	Delete(ctx context.Context, sessionId primitive.ObjectID) error
 }

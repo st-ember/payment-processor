@@ -1,6 +1,8 @@
 package kafkaadapter
 
 import (
+	"encoding/json"
+
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 )
 
@@ -14,13 +16,18 @@ func NewKafkaClient(p *kafka.Producer) *KafkaClient {
 	}
 }
 
-func (a *KafkaClient) SendMessage(topic string, key, value []byte) error {
+func (a *KafkaClient) SendMessage(topic string, key []byte, value map[string]string) error {
 	deliveryChan := make(chan kafka.Event)
 
-	err := a.p.Produce(&kafka.Message{
+	valBytes, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+
+	err = a.p.Produce(&kafka.Message{
 		TopicPartition: kafka.TopicPartition{Topic: &topic},
 		Key:            key,
-		Value:          value,
+		Value:          valBytes,
 	}, deliveryChan)
 	if err != nil {
 		return err
@@ -36,8 +43,4 @@ func (a *KafkaClient) SendMessage(topic string, key, value []byte) error {
 	}
 
 	return nil
-}
-
-type MessageSender interface {
-	SendMessage(topic string, key, value []byte) error
 }
