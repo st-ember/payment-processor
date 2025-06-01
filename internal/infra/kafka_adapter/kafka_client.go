@@ -4,14 +4,20 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 )
 
-type KafkaClient struct{}
+type KafkaClient struct {
+	p *kafka.Producer
+}
 
-func NewKafkaClient() *KafkaClient { return &KafkaClient{} }
+func NewKafkaClient(p *kafka.Producer) *KafkaClient {
+	return &KafkaClient{
+		p: p,
+	}
+}
 
-func (a *KafkaClient) SendMessage(p *kafka.Producer, topic string, key, value []byte) error {
+func (a *KafkaClient) SendMessage(topic string, key, value []byte) error {
 	deliveryChan := make(chan kafka.Event)
 
-	err := p.Produce(&kafka.Message{
+	err := a.p.Produce(&kafka.Message{
 		TopicPartition: kafka.TopicPartition{Topic: &topic},
 		Key:            key,
 		Value:          value,
@@ -33,5 +39,5 @@ func (a *KafkaClient) SendMessage(p *kafka.Producer, topic string, key, value []
 }
 
 type MessageSender interface {
-	SendMessage(p *kafka.Producer, topic string, key, value []byte) error
+	SendMessage(topic string, key, value []byte) error
 }

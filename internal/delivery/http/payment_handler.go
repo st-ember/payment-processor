@@ -1,44 +1,32 @@
-package handler
+package http
 
 import (
 	"encoding/json"
 	"net/http"
-	"paymentprocessor/internal/service"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"paymentprocessor/internal/usecase"
 )
 
-type RequestBody struct {
-	OrderId string `json:"order_id"`
-	UserId  string `json:"user_id"`
-}
-
 type PaymentHandler struct {
-	paymentProcessor service.PaymentProcessor
+	paymentProcessor usecase.Processor
 }
 
-func NewPaymentHandler(paymentProcessor service.PaymentProcessor) *PaymentHandler {
+func NewPaymentHandler(paymentProcessor usecase.Processor) *PaymentHandler {
 	return &PaymentHandler{paymentProcessor: paymentProcessor}
 }
 
+// check jwt before processing
 func (h *PaymentHandler) PaymentStart(w http.ResponseWriter, r *http.Request) {
 	// get order id
-	var body RequestBody
-	err := json.NewDecoder(r.Body).Decode(&body)
+	var req StartPaymentReq
+	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
 
-	orderId := body.OrderId
-	orderObjectID, err := primitive.ObjectIDFromHex(orderId)
-	if err != nil {
-		http.Error(w, "Cannot parse order_id", http.StatusInternalServerError)
-		return
-	}
-
 	// return the Stripe checkoutSession.url to frontend
-	checkOutUrl, err := h.paymentProcessor.ProcessPayment(r.Context(), orderObjectID, body.UserId)
+	useCaseReq := req.ToUsecaseRequest()
+	checkOutUrl, err := h.paymentProcessor.ProcessPayment(r.Context(), useCaseReq)
 	if err != nil {
 		http.Error(w, "Failed to process payment", http.StatusInternalServerError)
 		return

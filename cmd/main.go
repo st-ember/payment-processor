@@ -1,15 +1,13 @@
 package main
 
 import (
-	"context"
+	"log"
 	"net/http"
-	"os"
-	kafkaadapter "paymentprocessor/internal/adapters/kafka_adapter"
-	redisadapter "paymentprocessor/internal/adapters/redis_adapter"
-	stripeadapter "paymentprocessor/internal/adapters/stripe_adapter"
-	"paymentprocessor/internal/handler"
-	"paymentprocessor/internal/service"
-	"paymentprocessor/internal/storage"
+	httpDelivery "paymentprocessor/internal/delivery/http"
+	"paymentprocessor/internal/infra/config"
+	"paymentprocessor/internal/infra/factory"
+	stripeadapter "paymentprocessor/internal/infra/stripe_adapter"
+	"paymentprocessor/internal/usecase"
 
 	"github.com/joho/godotenv"
 )
@@ -20,41 +18,28 @@ func main() {
 		panic(err)
 	}
 
-	ctx := context.Background()
-
-	mongoClient, err := storage.Connect(os.Getenv("MONGO_CONN_URI"))
+	cfg, err := config.LoadEnvConfig()
 	if err != nil {
-		panic(err)
+		log.Fatalf("Failed to initialize config: %v", err)
 	}
 
-	// kafka
-	producer, err := kafkaadapter.CreateProducer()
+	infra, err := factory.NewInfrastructure(cfg)
 	if err != nil {
-		panic(err)
+		log.Fatalf("Failed to initialize infrastructure: %v", err)
 	}
-	defer producer.Close()
-	kafkaClient := kafkaadapter.NewKafkaClient()
-
-	// redis
-	redisClientFactory := redisadapter.NewRedisClientFactory()
-	rdb, err := redisClientFactory.InitRedisClient(ctx)
-	if err != nil {
-		panic(err)
-	}
-	redisUtil := redisadapter.NewRedisUtil()
+	defer infra.Close()
+	// init infra components
+	sessionRepo := infra.NewSessionRepository()
+	redisUtil := infra.NewRedisUtil()
+	kafkaClient := infra.NewKafkaClient()
 
 	// stripe
 	checkoutSessionUtil := stripeadapter.NewCheckoutSessionUtil()
 
-	// repos
-	orderRepo := storage.NewOrderRepository(mongoClient, "e-commerce", "order")
-	productRepo := storage.NewProductRepository(mongoClient, "e-commerce", "product")
+	paymentUsecase := usecase.NewPaymentUsecase(sessionRepo, redisUtil, kafkaClient, checkoutSessionUtil)
 
 	// handlers
-	paymentService := service.NewPaymentService(
-		orderRepo, productRepo, checkoutSessionUtil,
-		kafkaClient, redisUtil, producer, rdb)
-	paymentHandler := handler.NewPaymentHandler(paymentService)
+	paymentHandler := httpDelivery.NewPaymentHandler(paymentUsecase)
 
 	http.HandleFunc("/payment/start", paymentHandler.PaymentStart)
 	http.HandleFunc("/payment/confirm", paymentHandler.PaymentConfirmation)
