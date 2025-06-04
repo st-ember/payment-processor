@@ -2,8 +2,8 @@ package mongodb
 
 import (
 	"context"
+	"paymentprocessor/internal/domain/entity"
 	"paymentprocessor/internal/domain/enum"
-	"paymentprocessor/internal/domain/payment"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -39,17 +39,17 @@ func (r *SessionRepo) Insert(ctx context.Context, orderId primitive.ObjectID, se
 	return nil
 }
 
-func (r *SessionRepo) GetBySessionId(ctx context.Context, sessionId string) (payment.StripeCheckoutSession, error) {
+func (r *SessionRepo) GetBySessionId(ctx context.Context, sessionId string) (entity.StripeCheckoutSession, error) {
 	var session StripeCheckoutSession
 	filter := bson.M{"session_id": sessionId}
 	err := r.collection.FindOne(ctx, filter).Decode(&session)
 	if err != nil {
-		return payment.StripeCheckoutSession{}, err
+		return entity.StripeCheckoutSession{}, err
 	}
 
 	paymentModel, err := session.ToDomainModel()
 	if err != nil {
-		return payment.StripeCheckoutSession{}, err
+		return entity.StripeCheckoutSession{}, err
 	}
 
 	return paymentModel, nil
@@ -64,7 +64,8 @@ func (r *SessionRepo) UpdateStatus(ctx context.Context, sessionId string, newSta
 	}
 	update := bson.M{
 		"$set": bson.M{
-			"status": newStatus,
+			"status":     newStatus,
+			"updated_at": time.Now(),
 		},
 	}
 
@@ -76,18 +77,48 @@ func (r *SessionRepo) UpdateStatus(ctx context.Context, sessionId string, newSta
 	return nil
 }
 
-func (r *SessionRepo) Delete(ctx context.Context, sessionId primitive.ObjectID) error {
+func (r *SessionRepo) BulkSetExpire(ctx context.Context, ids []primitive.ObjectID) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
+	now := time.Now()
 	filter := bson.M{
-		"_id": sessionId,
+		"_id": bson.M{"$in": ids},
+	}
+	update := bson.M{
+		"$set": bson.M{
+			"status":     enum.Expired.String(),
+			"updated_at": now,
+		},
 	}
 
-	_, err := r.collection.DeleteOne(ctx, filter)
+	_, err := r.collection.UpdateMany(ctx, filter, update)
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (r *SessionRepo) ListLatest(ctx context.Context) ([]entity.StripeCheckoutSession, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	var sessions []entity.StripeCheckoutSession
+
+	timeThreshold := time.Now().Add(-25 * time.Hour)
+	filter := bson.M{
+		"created_at": bson.M{"$gte": timeThreshold},
+	}
+	cursor, err := r.collection.Find(ctx, filter)
+	if err != nil {
+		return sessions, err
+	}
+
+	err = cursor.All(ctx, &sessions)
+	if err != nil {
+		return sessions, err
+	}
+
+	return sessions, nil
 }

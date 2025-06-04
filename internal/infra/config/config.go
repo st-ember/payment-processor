@@ -16,6 +16,7 @@ type Config struct {
 	Kafka   KafkaConfig
 	Server  ServerConfig
 	Stripe  StripeConfig
+	JWT     JwtConfig
 }
 
 // MongoDBConfig holds MongoDB connection settings
@@ -47,6 +48,10 @@ type ServerConfig struct {
 type StripeConfig struct {
 	Secret     string
 	SuccessURL string
+}
+
+type JwtConfig struct {
+	Secret []byte
 }
 
 func LoadEnvConfig() (*Config, error) {
@@ -81,6 +86,9 @@ func LoadEnvConfig() (*Config, error) {
 		Stripe: StripeConfig{
 			Secret:     os.Getenv("STRIPE_SECRET"),
 			SuccessURL: os.Getenv("STRIPE_SUCCESS_URL"),
+		},
+		JWT: JwtConfig{
+			Secret: []byte(os.Getenv("JWT_SECRET")),
 		},
 	}
 

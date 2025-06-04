@@ -3,22 +3,41 @@ package http
 import (
 	"encoding/json"
 	"net/http"
+	jwthelper "paymentprocessor/internal/lib/jwt"
 	"paymentprocessor/internal/usecase"
+	"strings"
 )
 
 type PaymentHandler struct {
-	paymentProcessor usecase.Processor
+	usecase   *usecase.PaymentUsecase
+	jwtHelper *jwthelper.JWTHelper
 }
 
-func NewPaymentHandler(paymentProcessor usecase.Processor) *PaymentHandler {
-	return &PaymentHandler{paymentProcessor: paymentProcessor}
+func NewPaymentHandler(usecase *usecase.PaymentUsecase, jwtHelper *jwthelper.JWTHelper) *PaymentHandler {
+	return &PaymentHandler{usecase: usecase, jwtHelper: jwtHelper}
 }
 
-// check jwt before processing
 func (h *PaymentHandler) PaymentStart(w http.ResponseWriter, r *http.Request) {
+	// check jwt
+	var token string
+	authHeader := r.Header.Get("Authorization")
+	parts := strings.Split(authHeader, " ")
+	if len(parts) == 2 && parts[0] == "Bearer" {
+		token = parts[1]
+	} else {
+		// Handle missing or malformed token
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	_, err := h.jwtHelper.ParseToken(token)
+	if err != nil {
+		http.Error(w, "Invalid claims", http.StatusUnauthorized)
+	}
+
 	// get order id
 	var req StartPaymentReq
-	err := json.NewDecoder(r.Body).Decode(&req)
+	err = json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
@@ -26,7 +45,7 @@ func (h *PaymentHandler) PaymentStart(w http.ResponseWriter, r *http.Request) {
 
 	// return the Stripe checkoutSession.url to frontend
 	useCaseReq := req.ToUsecaseRequest()
-	checkOutUrl, err := h.paymentProcessor.ProcessPayment(r.Context(), useCaseReq)
+	checkOutUrl, err := h.usecase.ProcessPayment(r.Context(), useCaseReq)
 	if err != nil {
 		http.Error(w, "Failed to process payment", http.StatusInternalServerError)
 		return

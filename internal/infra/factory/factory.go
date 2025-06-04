@@ -3,9 +3,9 @@ package factory
 import (
 	"context"
 	"paymentprocessor/internal/infra/config"
-	kafkaadapter "paymentprocessor/internal/infra/kafka_adapter"
+	kafkaadapter "paymentprocessor/internal/infra/kafka"
 	"paymentprocessor/internal/infra/persistence/mongodb"
-	redisadapter "paymentprocessor/internal/infra/redis_adapter"
+	redisadapter "paymentprocessor/internal/infra/redis"
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"

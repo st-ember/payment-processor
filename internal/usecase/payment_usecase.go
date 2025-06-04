@@ -5,9 +5,9 @@ import (
 	"paymentprocessor/internal/domain"
 	"paymentprocessor/internal/domain/enum"
 	"paymentprocessor/internal/domain/request"
-	kafkaadapter "paymentprocessor/internal/infra/kafka_adapter"
-	redisadapter "paymentprocessor/internal/infra/redis_adapter"
-	stripeadapter "paymentprocessor/internal/infra/stripe_adapter"
+	kafkaadapter "paymentprocessor/internal/infra/kafka"
+	redisadapter "paymentprocessor/internal/infra/redis"
+	stripeadapter "paymentprocessor/internal/lib/stripe"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -128,14 +128,4 @@ func (u *PaymentUsecase) ConfirmPayment(ctx context.Context, sessionId string, s
 	// add concluded session to db
 
 	return nil
-}
-
-type Processor interface {
-	ProcessPayment(
-		ctx context.Context,
-		req request.StartPaymentReq) (string, error)
-}
-
-type Confirmer interface {
-	ConfirmPayment(ctx context.Context, sessionId string, status enum.StripeStatus) error
 }

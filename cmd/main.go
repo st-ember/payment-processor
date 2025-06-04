@@ -6,8 +6,10 @@ import (
 	httpDelivery "paymentprocessor/internal/delivery/http"
 	"paymentprocessor/internal/infra/config"
 	"paymentprocessor/internal/infra/factory"
-	stripeadapter "paymentprocessor/internal/infra/stripe_adapter"
+	"paymentprocessor/internal/lib/jwt"
+	stripeadapter "paymentprocessor/internal/lib/stripe"
 	"paymentprocessor/internal/usecase"
+	"paymentprocessor/internal/worker"
 
 	"github.com/joho/godotenv"
 )
@@ -33,13 +35,15 @@ func main() {
 	redisUtil := infra.NewRedisUtil()
 	kafkaClient := infra.NewKafkaClient()
 
-	// stripe
+	// lib
 	checkoutSessionUtil := stripeadapter.NewCheckoutSessionUtil()
+	jwtHelper := jwt.NewJWTHelper(cfg.JWT.Secret)
 
+	// usecase
 	paymentUsecase := usecase.NewPaymentUsecase(sessionRepo, redisUtil, kafkaClient, checkoutSessionUtil)
 
 	// handlers
-	paymentHandler := httpDelivery.NewPaymentHandler(paymentUsecase)
+	paymentHandler := httpDelivery.NewPaymentHandler(paymentUsecase, jwtHelper)
 
 	http.HandleFunc("/payment/start", paymentHandler.PaymentStart)
 	http.HandleFunc("/payment/confirm", paymentHandler.PaymentConfirmation)
@@ -47,4 +51,8 @@ func main() {
 	if err := http.ListenAndServe(":8000", nil); err != nil {
 		panic(err)
 	}
+
+	// worker
+	scheduler := worker.NewScheduler(sessionRepo)
+	scheduler.Start()
 }
