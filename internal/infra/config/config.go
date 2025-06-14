@@ -94,3 +94,27 @@ func LoadEnvConfig() (*Config, error) {
 
 	return cfg, nil
 }
+
+// NewDefaultConfig returns a new Config with default values
+func NewDefaultConfig() *Config {
+	return &Config{
+		MongoDB: MongoDBConfig{
+			URI:      "mongodb://localhost:27017",
+			Database: "ecommerce_payment_ms",
+			Timeout:  10 * time.Second,
+		},
+		Redis: RedisConfig{
+			Addr:     "localhost:6379",
+			Password: "",
+			DB:       0,
+		},
+		Kafka: KafkaConfig{
+			Brokers: []string{"localhost:9092"},
+		},
+		Server: ServerConfig{
+			Port:         ":8080",
+			ReadTimeout:  5 * time.Second,
+			WriteTimeout: 10 * time.Second,
+		},
+	}
+}
