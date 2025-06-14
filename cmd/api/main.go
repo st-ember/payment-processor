@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	httpDelivery "paymentprocessor/internal/delivery/http"
@@ -30,13 +31,14 @@ func main() {
 		log.Fatalf("Failed to initialize infrastructure: %v", err)
 	}
 	defer infra.Close()
+
 	// init infra components
 	sessionRepo := infra.NewSessionRepository()
 	redisUtil := infra.NewRedisUtil()
 	kafkaClient := infra.NewKafkaClient()
 
 	// lib
-	checkoutSessionUtil := stripeadapter.NewCheckoutSessionUtil()
+	checkoutSessionUtil := stripeadapter.NewCheckoutSessionUtil(cfg.Stripe.Secret, cfg.Stripe.SuccessURL)
 	jwtHelper := jwt.NewJWTHelper(cfg.JWT.Secret)
 
 	// usecase
@@ -48,11 +50,16 @@ func main() {
 	http.HandleFunc("/payment/start", paymentHandler.PaymentStart)
 	http.HandleFunc("/payment/confirm", paymentHandler.PaymentConfirmation)
 
+	fmt.Println("listening on port 8000")
 	if err := http.ListenAndServe(":8000", nil); err != nil {
 		panic(err)
 	}
 
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Printf("Fallback handler: %s %s\n", r.Method, r.URL.Path)
+	})
+
 	// worker
-	scheduler := worker.NewScheduler(sessionRepo)
+	scheduler := worker.NewScheduler(sessionRepo, kafkaClient)
 	scheduler.Start()
 }
