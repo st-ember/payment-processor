@@ -8,7 +8,6 @@ import (
 	redisadapter "paymentprocessor/internal/infra/redis"
 	"time"
 
-	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -18,7 +17,7 @@ import (
 type Infrastructure struct {
 	MongoDB *mongo.Database
 	Redis   *redis.Client
-	Kafka   *kafka.Producer
+	Kafka   *kafkaadapter.KafkaClient
 	Config  *config.Config
 }
 
@@ -47,10 +46,7 @@ func NewInfrastructure(cfg *config.Config) (*Infrastructure, error) {
 	}
 
 	// Initialize Kafka
-	kafkaConfig := &kafka.ConfigMap{"bootstrap.servcers": cfg.Kafka.Brokers}
-
-	// producer, err := kafka.NewProducer(cfg.Kafka.Brokers, kafkaConfig)
-	producer, err := kafka.NewProducer(kafkaConfig)
+	kafkaClient, err := kafkaadapter.NewKafkaClient(cfg.Kafka.Brokers)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +54,7 @@ func NewInfrastructure(cfg *config.Config) (*Infrastructure, error) {
 	return &Infrastructure{
 		MongoDB: db,
 		Redis:   redisClient,
-		Kafka:   producer,
+		Kafka:   kafkaClient,
 		Config:  cfg,
 	}, nil
 }
@@ -72,7 +68,7 @@ func (i *Infrastructure) NewRedisUtil() *redisadapter.RedisUtil {
 }
 
 func (i *Infrastructure) NewKafkaClient() *kafkaadapter.KafkaClient {
-	return kafkaadapter.NewKafkaClient(i.Kafka)
+	return i.Kafka
 }
 
 func (i *Infrastructure) Close() error {
@@ -83,9 +79,9 @@ func (i *Infrastructure) Close() error {
 		return err
 	}
 
-	// no error check for confluent kafka shutdown
-	i.Kafka.Flush(15 * 1000)
-	i.Kafka.Close()
+	if err := i.Kafka.Close(); err != nil {
+		return err
+	}
 
 	return i.MongoDB.Client().Disconnect(ctx)
 }
