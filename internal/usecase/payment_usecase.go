@@ -50,14 +50,13 @@ func (u *PaymentUsecase) ProcessPayment(ctx context.Context, req request.StartPa
 	}
 
 	// tell order ms about the payment status through Kafka
-	checkoutMsg := map[string]string{
+	checkoutMsg := map[string]interface{}{
 		"timestamp": time.Now().Format(time.RFC3339),
 		"status":    enum.Open.String(),
 	}
 
 	err = u.kafkaClient.SendMessage(
-		kafkaadapter.Topic.PaymentCheckoutSessionStatus,
-		[]byte(req.OrderId.Hex()),
+		kafkaadapter.Topic.CheckoutStatus,
 		checkoutMsg,
 	)
 	if err != nil {
@@ -77,7 +76,7 @@ func (u *PaymentUsecase) ProcessPayment(ctx context.Context, req request.StartPa
 	}
 
 	// log stripe session event to Kafka
-	logMsg := map[string]string{
+	logMsg := map[string]interface{}{
 		"level":     "info",
 		"timestamp": time.Now().Format(time.RFC3339),
 		"order_id":  req.OrderId.Hex(),
@@ -88,7 +87,6 @@ func (u *PaymentUsecase) ProcessPayment(ctx context.Context, req request.StartPa
 
 	err = u.kafkaClient.SendMessage(
 		kafkaadapter.Topic.LogPaymentCheckout,
-		[]byte(req.OrderId.Hex()),
 		logMsg,
 	)
 	if err != nil {
@@ -98,7 +96,8 @@ func (u *PaymentUsecase) ProcessPayment(ctx context.Context, req request.StartPa
 	return checkoutUrl, nil
 }
 
-func (u *PaymentUsecase) ConfirmPayment(ctx context.Context, sessionId string, status enum.StripeStatus) error {
+func (u *PaymentUsecase) ConfirmPayment(ctx context.Context, session stripe.CheckoutSession) error {
+	sessionId := session.ID
 	// get orderId from redis
 	orderId, err := u.redisUtil.GetOrderIdFromSession(ctx, sessionId)
 	if err != nil {
@@ -111,21 +110,25 @@ func (u *PaymentUsecase) ConfirmPayment(ctx context.Context, sessionId string, s
 	}
 
 	// tell order ms about payment conclusion status
-	msg := map[string]string{
+	msg := map[string]interface{}{
 		"timestamp": time.Now().Format(time.RFC3339),
-		"status":    status.String(),
+		"status":    string(session.Status),
+		"order_id":  orderId,
 	}
 
 	err = u.kafkaClient.SendMessage(
-		kafkaadapter.Topic.PaymentCheckoutSessionStatus,
-		[]byte(orderId),
+		kafkaadapter.Topic.CheckoutStatus,
 		msg,
 	)
 	if err != nil {
 		return err
 	}
 
-	// add concluded session to db
+	// update status in db
+	err = u.sessionRepo.UpdateStatus(ctx, sessionId, session.Status)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
