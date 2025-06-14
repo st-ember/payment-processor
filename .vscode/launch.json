@@ -2,21 +2,15 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug Payment Processor",
+      "name": "debug",
       "type": "go",
       "request": "launch",
-      "mode": "auto",
-      "program": "${workspaceFolder}/cmd/main.go",
+      "mode": "debug",
+      "program": "${workspaceFolder}/cmd/api/main.go",
+      "args": [],
+      "showLog": true,
       "env": {},
-      "args": []
-    },
-    {
-      "name": "Debug Tests",
-      "type": "go",
-      "request": "launch",
-      "mode": "test",
-      "program": "${fileDirname}",
-      "args": []
+      "buildFlags": "-gcflags=all=-N"
     }
   ]
 }

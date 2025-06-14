@@ -6,6 +6,7 @@ import (
 	"paymentprocessor/internal/domain/enum"
 	"time"
 
+	"github.com/stripe/stripe-go/v72"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -55,7 +56,7 @@ func (r *SessionRepo) GetBySessionId(ctx context.Context, sessionId string) (ent
 	return paymentModel, nil
 }
 
-func (r *SessionRepo) UpdateStatus(ctx context.Context, sessionId string, newStatus enum.StripeStatus) error {
+func (r *SessionRepo) UpdateStatus(ctx context.Context, sessionId string, newStatus stripe.CheckoutSessionStatus) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 

@@ -3,15 +3,20 @@ package worker
 import (
 	"context"
 	"paymentprocessor/internal/domain"
+	kafkaadapter "paymentprocessor/internal/infra/kafka"
 	"time"
 )
 
 type Scheduler struct {
 	sessionRepo domain.SessionRepo
+	kafkaClient *kafkaadapter.KafkaClient
 }
 
-func NewScheduler(sessionRepo domain.SessionRepo) *Scheduler {
-	return &Scheduler{sessionRepo: sessionRepo}
+func NewScheduler(sessionRepo domain.SessionRepo, kafkaClient *kafkaadapter.KafkaClient) *Scheduler {
+	return &Scheduler{
+		sessionRepo: sessionRepo,
+		kafkaClient: kafkaClient,
+	}
 }
 
 func (s *Scheduler) Start() {
@@ -21,7 +26,7 @@ func (s *Scheduler) Start() {
 	cleanupTicker := time.NewTicker(12 * time.Hour)
 	defer cleanupTicker.Stop()
 
-	cleanupWorker := NewCleanupWorker(s.sessionRepo)
+	cleanupWorker := NewCleanupWorker(s.sessionRepo, s.kafkaClient)
 
 	for range cleanupTicker.C {
 		cleanupWorker.Cleanup(ctx)

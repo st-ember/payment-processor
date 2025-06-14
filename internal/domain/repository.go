@@ -3,8 +3,8 @@ package domain
 import (
 	"context"
 	"paymentprocessor/internal/domain/entity"
-	"paymentprocessor/internal/domain/enum"
 
+	"github.com/stripe/stripe-go/v72"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -13,7 +13,7 @@ type SessionRepo interface {
 
 	GetBySessionId(ctx context.Context, sessionId string) (entity.StripeCheckoutSession, error)
 
-	UpdateStatus(ctx context.Context, sessionId string, newStatus enum.StripeStatus) error
+	UpdateStatus(ctx context.Context, sessionId string, newStatus stripe.CheckoutSessionStatus) error
 
 	BulkSetExpire(ctx context.Context, ids []primitive.ObjectID) error
 

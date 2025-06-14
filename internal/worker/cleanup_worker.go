@@ -3,16 +3,22 @@ package worker
 import (
 	"context"
 	"paymentprocessor/internal/domain"
+	kafkaadapter "paymentprocessor/internal/infra/kafka"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type CleanupWorker struct {
 	sessionRepo domain.SessionRepo
+	kafkaClient *kafkaadapter.KafkaClient
 }
 
-func NewCleanupWorker(sessionRepo domain.SessionRepo) *CleanupWorker {
-	return &CleanupWorker{sessionRepo: sessionRepo}
+func NewCleanupWorker(sessionRepo domain.SessionRepo, kafkaClient *kafkaadapter.KafkaClient) *CleanupWorker {
+	return &CleanupWorker{
+		sessionRepo: sessionRepo,
+		kafkaClient: kafkaClient,
+	}
 }
 
 func (w *CleanupWorker) Cleanup(ctx context.Context) error {
@@ -33,6 +39,20 @@ func (w *CleanupWorker) Cleanup(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	// tell order ms about the expired ids
+	batchMsg := map[string]interface{}{
+		"timestamp":   time.Now().Format(time.RFC3339),
+		"expired_ids": expiredIds,
+	}
+
+	err = w.kafkaClient.SendMessage(
+		kafkaadapter.Topic.CheckoutStatusBatch,
+		batchMsg,
+	)
+	if err != nil {
+		return err
 	}
 
 	return nil
