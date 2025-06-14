@@ -1,7 +1,6 @@
 package entity
 
 import (
-	"paymentprocessor/internal/domain/enum"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -12,5 +11,5 @@ type StripeCheckoutSession struct {
 	SessionId string
 	CreatedAt time.Time
 	UpdatedAt time.Time
-	Status    enum.StripeStatus
+	Status    string
 }

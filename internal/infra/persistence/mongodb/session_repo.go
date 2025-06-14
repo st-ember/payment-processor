@@ -3,7 +3,6 @@ package mongodb
 import (
 	"context"
 	"paymentprocessor/internal/domain/entity"
-	"paymentprocessor/internal/domain/enum"
 	"time"
 
 	"github.com/stripe/stripe-go/v72"
@@ -28,7 +27,7 @@ func (r *SessionRepo) Insert(ctx context.Context, orderId primitive.ObjectID, se
 	session := StripeCheckoutSession{
 		Id:        orderId,
 		SessionId: sessionId,
-		Status:    enum.Open.String(),
+		Status:    string(stripe.CheckoutSessionStatusOpen),
 		CreatedAt: time.Now(),
 	}
 
@@ -88,7 +87,7 @@ func (r *SessionRepo) BulkSetExpire(ctx context.Context, ids []primitive.ObjectI
 	}
 	update := bson.M{
 		"$set": bson.M{
-			"status":     enum.Expired.String(),
+			"status":     stripe.CheckoutSessionStatusExpired,
 			"updated_at": now,
 		},
 	}

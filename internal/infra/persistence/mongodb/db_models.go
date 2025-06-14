@@ -2,7 +2,6 @@ package mongodb
 
 import (
 	"paymentprocessor/internal/domain/entity"
-	"paymentprocessor/internal/domain/enum"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -17,16 +16,10 @@ type StripeCheckoutSession struct {
 }
 
 func (d *StripeCheckoutSession) ToDomainModel() (entity.StripeCheckoutSession, error) {
-	status, err := enum.ParseStripeStatus(d.Status)
-
-	if err != nil {
-		return entity.StripeCheckoutSession{}, err
-	}
-
 	return entity.StripeCheckoutSession{
 		Id:        d.Id,
 		SessionId: d.SessionId,
-		Status:    status,
+		Status:    d.Status,
 		CreatedAt: d.CreatedAt,
 		UpdatedAt: d.UpdatedAt,
 	}, nil

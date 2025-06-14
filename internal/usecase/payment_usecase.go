@@ -3,7 +3,6 @@ package usecase
 import (
 	"context"
 	"paymentprocessor/internal/domain"
-	"paymentprocessor/internal/domain/enum"
 	"paymentprocessor/internal/domain/request"
 	kafkaadapter "paymentprocessor/internal/infra/kafka"
 	redisadapter "paymentprocessor/internal/infra/redis"
@@ -52,7 +51,7 @@ func (u *PaymentUsecase) ProcessPayment(ctx context.Context, req request.StartPa
 	// tell order ms about the payment status through Kafka
 	checkoutMsg := map[string]interface{}{
 		"timestamp": time.Now().Format(time.RFC3339),
-		"status":    enum.Open.String(),
+		"status":    stripe.CheckoutSessionStatusOpen,
 	}
 
 	err = u.kafkaClient.SendMessage(
