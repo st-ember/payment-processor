@@ -33,6 +33,7 @@ func (r *SessionRepo) Insert(ctx context.Context, orderId primitive.ObjectID, se
 
 	_, err := r.collection.InsertOne(ctx, session)
 	if err != nil {
+
 		return err
 	}
 

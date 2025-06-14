@@ -1,11 +1,13 @@
 package kafkaadapter
 
 var Topic = struct {
-	LogPaymentCheckout  string
+	PaymentCheckout     string
 	CheckoutStatus      string
 	CheckoutStatusBatch string
+	PaymentError        string
 }{
-	LogPaymentCheckout:  "log.payment.checkout",
+	PaymentCheckout:     "log.payment.checkout",
 	CheckoutStatus:      "payment.checkout_session.status",
 	CheckoutStatusBatch: "payment.checkout_session.status.batch",
+	PaymentError:        "log.payment.error",
 }

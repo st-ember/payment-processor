@@ -2,6 +2,7 @@ package kafkaadapter
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/IBM/sarama"
 )
@@ -25,7 +26,7 @@ func NewKafkaClient(brokers []string) (*KafkaClient, error) {
 	}, nil
 }
 
-func (a *KafkaClient) SendMessage(topic string, value map[string]interface{}) error {
+func (c *KafkaClient) SendMessage(topic string, value map[string]interface{}) error {
 	valBytes, err := json.Marshal(value)
 	if err != nil {
 		return err
@@ -36,14 +37,18 @@ func (a *KafkaClient) SendMessage(topic string, value map[string]interface{}) er
 		Value: sarama.ByteEncoder(valBytes),
 	}
 
-	_, _, err = a.producer.SendMessage(msg)
+	_, _, err = c.producer.SendMessage(msg)
 	return err
 }
 
-func (a *KafkaClient) LogError(topic string, value map[string]interface{}) error {
-	return a.SendMessage(topic, value)
+func (c *KafkaClient) LogError(topic, description string, err error) error {
+	value := map[string]interface{}{
+		"time_stamp": time.Now(),
+		description:  err,
+	}
+	return c.SendMessage(topic, value)
 }
 
-func (a *KafkaClient) Close() error {
-	return a.producer.Close()
+func (c *KafkaClient) Close() error {
+	return c.producer.Close()
 }

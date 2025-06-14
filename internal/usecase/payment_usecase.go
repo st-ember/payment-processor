@@ -45,6 +45,7 @@ func (u *PaymentUsecase) ProcessPayment(ctx context.Context, req request.StartPa
 	// tell stripe about the expected payment
 	checkoutId, checkoutUrl, err := u.stripeUtil.StartSession(stripeParams)
 	if err != nil {
+		u.kafkaClient.LogError(kafkaadapter.Topic.PaymentError, "Could not start stripe checkout session", err)
 		return "", err
 	}
 
@@ -65,12 +66,14 @@ func (u *PaymentUsecase) ProcessPayment(ctx context.Context, req request.StartPa
 	// tell redis about the checkout id we got from stripe
 	err = u.redisUtil.SetStripeSession(ctx, checkoutId, req.OrderId.Hex())
 	if err != nil {
+		u.kafkaClient.LogError(kafkaadapter.Topic.PaymentError, "Could not cache checkout session", err)
 		return "", err
 	}
 
 	// log to db in case Redis crashes
 	err = u.sessionRepo.Insert(ctx, req.OrderId, checkoutId)
 	if err != nil {
+		u.kafkaClient.LogError(kafkaadapter.Topic.PaymentError, "Could not insert into db", err)
 		return "", err
 	}
 
@@ -85,7 +88,7 @@ func (u *PaymentUsecase) ProcessPayment(ctx context.Context, req request.StartPa
 	}
 
 	err = u.kafkaClient.SendMessage(
-		kafkaadapter.Topic.LogPaymentCheckout,
+		kafkaadapter.Topic.PaymentCheckout,
 		logMsg,
 	)
 	if err != nil {
@@ -102,8 +105,10 @@ func (u *PaymentUsecase) ConfirmPayment(ctx context.Context, session stripe.Chec
 	if err != nil {
 		if err == redis.Nil {
 			// if sessionId does not exist in redis, try to find in db
+			u.kafkaClient.LogError(kafkaadapter.Topic.PaymentError, "Session id not found in redis", err)
 			u.sessionRepo.GetBySessionId(ctx, sessionId)
 		} else {
+			u.kafkaClient.LogError(kafkaadapter.Topic.PaymentError, "Error reading cache", err)
 			return err
 		}
 	}
@@ -126,6 +131,7 @@ func (u *PaymentUsecase) ConfirmPayment(ctx context.Context, session stripe.Chec
 	// update status in db
 	err = u.sessionRepo.UpdateStatus(ctx, sessionId, session.Status)
 	if err != nil {
+		u.kafkaClient.LogError(kafkaadapter.Topic.PaymentError, "Could not update status in db", err)
 		return err
 	}
 
