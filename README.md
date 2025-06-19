@@ -20,8 +20,10 @@ The service follows clean architecture principles with the following layers:
 ├── internal/
 │   ├── domain/         # Enterprise business rules
 │   ├── usecase/        # Application business rules
-│   ├── repository/     # Repository interfaces
-│   └── delivery/       # Delivery mechanisms (HTTP, gRPC)
+│   ├── infra/          # IO Infrasctructure (Redis, Kafka, Mongo)
+│   ├── lib/            # Third party package wrappers (Stripe, JWT)
+│   ├── worker/         # Background workers
+│   └── delivery/       # Delivery mechanisms
 └── go.mod             # Go module file
 ```
 
@@ -43,11 +45,3 @@ go run cmd/api/main.go
 
 - POST /api/payment/start - Trigger Stripe checkout session
 - POST /api/payment/confirm - Confirm Stripe checkout session
-
-## Testing
-
-Run tests:
-
-```bash
-go test ./...
-```
